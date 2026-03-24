@@ -2,61 +2,94 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Campo Minado Genético</title>
+<title>Campo Minado Genético PRO</title>
 <style>
   body { font-family: Arial; text-align: center; background:#111; color:#fff; }
-  #grid { display: grid; grid-template-columns: repeat(10, 40px); gap: 4px; justify-content: center; margin-top:20px; }
-  .cell { width:40px; height:40px; background:#444; display:flex; align-items:center; justify-content:center; cursor:pointer; }
+  #grid { display: grid; gap: 4px; justify-content: center; margin-top:20px; }
+  .cell { width:40px; height:40px; background:#444; display:flex; align-items:center; justify-content:center; cursor:pointer; font-weight:bold; }
   .revealed { background:#ddd; color:#000; }
+  .flag { background:orange; }
 </style>
 </head>
 <body>
-<h1>Campo Minado Genético</h1>
-<p>AA = dominante | Aa = intermediário | aa = recessivo (mina)</p>
+<h1>Campo Minado Genético 🧬</h1>
+<p>Clique = revelar | Segurar = bandeira 🚩</p>
 <button onclick="startGame()">Nova Fase</button>
 <div id="grid"></div><script>
 const size = 10;
+const mineChance = 0.2;
 let board = [];
-
-function getNeighbors(x,y){
-  return [
-    [x-1,y],[x+1,y],[x,y-1],[x,y+1]
-  ].filter(([i,j])=> i>=0 && j>=0 && i<size && j<size);
-}
+let revealed = [];
+let flags = [];
 
 function startGame(){
-  board = Array(size).fill().map(()=>Array(size).fill(null));
+  board = [];
+  revealed = [];
+  flags = [];
 
-  // Primeiro coloca AA
   for(let i=0;i<size;i++){
+    board[i]=[];
+    revealed[i]=[];
+    flags[i]=[];
     for(let j=0;j<size;j++){
-      if(Math.random()<0.15) board[i][j]="AA";
+      board[i][j] = Math.random()<mineChance ? "aa" : "safe";
+      revealed[i][j] = false;
+      flags[i][j] = false;
     }
   }
 
-  // Garante regra: AA cercado por As
-  for(let i=0;i<size;i++){
-    for(let j=0;j<size;j++){
-      if(board[i][j]==="AA"){
-        getNeighbors(i,j).forEach(([x,y])=>{
-          if(board[x][y]===null) board[x][y]="Aa";
-        });
-      }
-    }
+  const grid = document.getElementById("grid");
+  grid.style.gridTemplateColumns = `repeat(${size}, 40px)`;
+  render();
+}
+
+function getNeighbors(x,y){
+  let dirs = [[1,0],[-1,0],[0,1],[0,-1]];
+  return dirs
+    .map(([dx,dy])=>[x+dx,y+dy])
+    .filter(([i,j])=> i>=0 && j>=0 && i<size && j<size);
+}
+
+function countMines(x,y){
+  return getNeighbors(x,y)
+    .filter(([i,j])=> board[i][j]==="aa").length;
+}
+
+function reveal(x,y){
+  if(revealed[x][y] || flags[x][y]) return;
+
+  revealed[x][y]=true;
+
+  if(board[x][y]==="aa"){
+    alert("💀 Você encontrou um gene recessivo (aa)! Perdeu!");
+    startGame();
+    return;
   }
 
-  // Preenche resto com Aa ou aa respeitando regra
-  for(let i=0;i<size;i++){
-    for(let j=0;j<size;j++){
-      if(board[i][j]===null){
-        let neighbors = getNeighbors(i,j);
-        let hasAaNeighbor = neighbors.some(([x,y])=> board[x][y]==="Aa");
-        board[i][j] = hasAaNeighbor ? (Math.random()<0.3?"aa":"Aa") : "Aa";
-      }
-    }
+  let count = countMines(x,y);
+
+  if(count===0){
+    getNeighbors(x,y).forEach(([i,j])=> reveal(i,j));
   }
 
   render();
+  checkWin();
+}
+
+function toggleFlag(x,y){
+  if(revealed[x][y]) return;
+  flags[x][y] = !flags[x][y];
+  render();
+}
+
+function checkWin(){
+  for(let i=0;i<size;i++){
+    for(let j=0;j<size;j++){
+      if(board[i][j]!=="aa" && !revealed[i][j]) return;
+    }
+  }
+  alert("🏆 Você venceu! Dominou a genética!");
+  startGame();
 }
 
 function render(){
@@ -67,21 +100,26 @@ function render(){
     for(let j=0;j<size;j++){
       const div = document.createElement("div");
       div.className="cell";
-      div.onclick = ()=> reveal(div,i,j);
+
+      if(revealed[i][j]){
+        div.classList.add("revealed");
+        let count = countMines(i,j);
+        div.textContent = count===0 ? "" : count;
+      }
+
+      if(flags[i][j]){
+        div.classList.add("flag");
+        div.textContent = "🚩";
+      }
+
+      div.onclick = ()=> reveal(i,j);
+      div.oncontextmenu = (e)=>{
+        e.preventDefault();
+        toggleFlag(i,j);
+      };
+
       grid.appendChild(div);
     }
-  }
-}
-
-function reveal(div,i,j){
-  if(div.classList.contains("revealed")) return;
-
-  div.classList.add("revealed");
-  div.textContent = board[i][j];
-
-  if(board[i][j]==="aa"){
-    alert("Você clicou em um gene recessivo (aa)! Perdeu!");
-    startGame();
   }
 }
 
